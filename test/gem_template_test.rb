@@ -126,13 +126,10 @@ class GemTemplateTest < Minitest::Test
     refute File.exist?(File.expand_path("../lib/gem_template/services/example_service.rb", __dir__))
   end
 
-  def test_example_capability_wraps_include_for_and_is_not_enabled_globally
-    source = File.read(File.expand_path("../lib/gem_template/capabilities/example.rb", __dir__))
-
-    assert_includes source, "def self.to(**)"
-    assert_includes source, "RecordingStudio::Capabilities.include_for(:example, **)"
-    refute_includes source, "enable_capability"
-    refute_includes source, "set_capability_options"
+  def test_installing_the_gem_does_not_register_or_enable_an_example_capability
+    refute defined?(RecordingStudio::Capabilities::Example)
+    refute RecordingStudio.registered_capabilities.key?(:example)
+    refute RecordingStudio.capability_enabled?(:example, for: "Workspace")
     refute RecordingStudio.capability_enabled?(:example, for: "Folder")
     refute RecordingStudio.capability_enabled?(:example, for: "Page")
     assert_empty RecordingStudio.configuration.enabled_recordable_types_for(:example)
