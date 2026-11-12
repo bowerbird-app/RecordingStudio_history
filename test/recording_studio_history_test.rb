@@ -337,6 +337,36 @@ class RecordingStudioHistoryTest < Minitest::Test
     refute_includes recordings_tree_view, "This tree is generated from RecordingStudio::Recording records"
   end
 
+  def test_readme_documents_hooks_only_and_an_undecided_mount
+    readme = File.read(File.expand_path("../README.md", __dir__))
+
+    assert_includes readme, "`hooks`, a `RecordingStudio::Hooks` instance"
+    assert_includes readme, "Where the engine is mounted is still a product decision."
+    refute_includes readme, "RECORDING_STUDIO_HISTORY_API_KEY"
+    refute_includes readme, "enable_feature_x"
+    refute_includes readme, "recording_studio_history:migrations"
+    refute_includes readme, "recording_studio_history_pages"
+  end
+
+  def test_engine_ships_no_sample_table_or_migrations_generator
+    root = File.expand_path("..", __dir__)
+
+    refute File.exist?(File.join(root, "db/migrate/20250101000001_create_recording_studio_history_pages.rb"))
+    refute File.exist?(File.join(root, "lib/generators/recording_studio_history/migrations/migrations_generator.rb"))
+    refute File.exist?(
+      File.join(root, "lib/generators/recording_studio_history/install/templates/recording_studio_history.yml")
+    )
+  end
+
+  def test_dummy_home_does_not_advertise_engine_migrations
+    home = File.read(File.expand_path("dummy/app/views/home/index.html.erb", __dir__))
+
+    assert_includes home, "The engine ships no addon tables yet."
+    assert_includes home, "Where the engine is mounted is still a product decision."
+    refute_includes home, "recording_studio_history:migrations"
+    refute_includes home, "PostgreSQL UUID-oriented migrations"
+  end
+
   def test_engine_does_not_ship_a_home_view
     view_path = File.expand_path("../app/views/recording_studio_history/home/index.html.erb", __dir__)
 

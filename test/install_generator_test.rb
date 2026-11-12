@@ -147,14 +147,50 @@ class InstallGeneratorTest < Minitest::Test
     assert_equal ["INSTALL.md"], shown_templates
   end
 
-  def test_install_guide_includes_migration_and_host_setup_steps
+  def test_install_guide_describes_hooks_and_leaves_the_mount_undecided
     install_guide = File.read(INSTALL_TEMPLATE_PATH)
 
-    assert_includes install_guide, "bin/rails generate recording_studio_history:migrations"
-    assert_includes install_guide, "bin/rails db:migrate"
-    assert_includes install_guide, "auth, layout, and current actor integration"
+    assert_includes install_guide, "RecordingStudioHistory.configuration.hooks"
+    assert_includes install_guide, "RecordingStudio::Hooks"
+    assert_includes install_guide, "Where the engine is mounted is still a product decision."
     assert_includes install_guide, "recording_studio_recordable"
+    refute_includes install_guide, "recording_studio_history:migrations"
+    refute_includes install_guide, "recording_studio_history.yml"
+    refute_includes install_guide, "db:migrate"
     refute_includes install_guide, "RecordingStudio v3"
+  end
+
+  def test_copy_initializer_writes_hooks_only_configuration
+    with_temp_app do |dir|
+      generator = build_generator(dir)
+      generator.copy_initializer
+
+      written = File.read(File.join(dir, "config/initializers/recording_studio_history.rb"))
+
+      assert_equal "RecordingStudioHistory.configure(&:hooks)\n", written.lines.last
+      refute_includes written, "api_key"
+      refute_includes written, "enable_feature_x"
+      refute_includes written, "RECORDING_STUDIO_HISTORY_API_KEY"
+    end
+  end
+
+  def test_initializer_template_exposes_hooks_only
+    template_path = File.expand_path(
+      "../lib/generators/recording_studio_history/install/templates/recording_studio_history_initializer.rb",
+      __dir__
+    )
+    yaml_path = File.expand_path(
+      "../lib/generators/recording_studio_history/install/templates/recording_studio_history.yml",
+      __dir__
+    )
+    template = File.read(template_path)
+
+    assert_includes template, "RecordingStudioHistory.configure(&:hooks)"
+    refute_includes template, "api_key"
+    refute_includes template, "enable_feature_x"
+    refute_includes template, "timeout"
+    refute_includes template, "RECORDING_STUDIO_HISTORY_API_KEY"
+    refute File.exist?(yaml_path)
   end
 
   private

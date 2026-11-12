@@ -51,49 +51,17 @@ module RecordingStudioHistory
       end
     end
 
-    # Run before_initialize hooks
-    initializer "recording_studio_history.before_initialize", before: "recording_studio_history.load_config" do |_app|
+    initializer "recording_studio_history.before_initialize",
+                before: "recording_studio_history.on_configuration" do |_app|
       RecordingStudioHistory.configuration.hooks.run(:before_initialize, self)
     end
 
-    initializer "recording_studio_history.load_config" do |app|
-      # Load config/recording_studio_history.yml via Rails config_for if present
-      if app.respond_to?(:config_for)
-        begin
-          yaml = begin
-            app.config_for(:recording_studio_history)
-          rescue StandardError
-            nil
-          end
-          RecordingStudioHistory.configuration.merge!(yaml) if yaml.respond_to?(:each)
-        rescue StandardError => _e
-          # ignore load errors; host app can provide initializer overrides
-        end
-      end
-
-      # Merge Rails.application.config.x.recording_studio_history if present
-      if app.config.respond_to?(:x) && app.config.x.respond_to?(:recording_studio_history)
-        xcfg = app.config.x.recording_studio_history
-        if xcfg.respond_to?(:to_h)
-          RecordingStudioHistory.configuration.merge!(xcfg.to_h)
-        else
-          begin
-            # try converting OrderedOptions
-            hash = {}
-            xcfg.each_pair { |k, v| hash[k] = v } if xcfg.respond_to?(:each_pair)
-            RecordingStudioHistory.configuration.merge!(hash) if hash&.any?
-          rescue StandardError => _e
-            # ignore
-          end
-        end
-      end
-
-      # Run on_configuration hooks after config is loaded
+    initializer "recording_studio_history.on_configuration" do |_app|
       RecordingStudioHistory.configuration.hooks.run(:on_configuration, RecordingStudioHistory.configuration)
     end
 
-    # Run after_initialize hooks
-    initializer "recording_studio_history.after_initialize", after: "recording_studio_history.load_config" do |_app|
+    initializer "recording_studio_history.after_initialize",
+                after: "recording_studio_history.on_configuration" do |_app|
       RecordingStudioHistory.configuration.hooks.run(:after_initialize, self)
     end
 

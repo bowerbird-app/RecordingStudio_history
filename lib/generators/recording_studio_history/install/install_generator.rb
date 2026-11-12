@@ -24,13 +24,6 @@ module RecordingStudioHistory
         template "recording_studio_history_initializer.rb", "config/initializers/recording_studio_history.rb"
       end
 
-      def add_yaml_config
-        prompt = "Add `config/recording_studio_history.yml` for environment-specific settings? [y/N]"
-        return unless yes?(prompt)
-
-        template "recording_studio_history.yml", "config/recording_studio_history.yml"
-      end
-
       def add_tailwind_source
         tailwind_css_path = Rails.root.join("app/assets/tailwind/application.css")
         return show_missing_tailwind_notice unless File.exist?(tailwind_css_path)

@@ -27,104 +27,24 @@ class EngineTest < Minitest::Test
     assert after_called
   end
 
-  def test_load_config_merges_config_sources_and_runs_on_configuration_hook
-    hook_called = false
-    hook_payload = nil
-    RecordingStudioHistory.configuration.hooks.on_configuration do |cfg|
-      hook_called = true
-      hook_payload = cfg
-    end
+  def test_on_configuration_initializer_runs_the_hook_without_reading_host_config
+    payload = nil
+    RecordingStudioHistory.configuration.hooks.on_configuration { |cfg| payload = cfg }
+    app = Object.new
+    app.define_singleton_method(:config_for) { raise "host config should not be read" }
 
-    xcfg = Struct.new(:recording_studio_history).new({ enable_feature_x: true })
-    app_config = Struct.new(:x).new(xcfg)
-    app = Struct.new(:config) do
-      def config_for(_name)
-        { api_key: "from_yaml", timeout: 12 }
-      end
-    end.new(app_config)
+    find_initializer("recording_studio_history.on_configuration").block.call(app)
 
-    find_initializer("recording_studio_history.load_config").block.call(app)
-
-    assert hook_called
-    assert_equal RecordingStudioHistory.configuration, hook_payload
-    assert_equal "from_yaml", RecordingStudioHistory.configuration.api_key
-    assert_equal 12, RecordingStudioHistory.configuration.timeout
-    assert_equal true, RecordingStudioHistory.configuration.enable_feature_x
+    assert_same RecordingStudioHistory.configuration, payload
   end
 
-  def test_load_config_handles_errors_and_each_pair_fallback
-    pair_config = Class.new do
-      def each_pair
-        yield(:timeout, 15)
-      end
-    end.new
+  def test_initializer_names_keep_hook_order_without_config_loading
+    names = RecordingStudioHistory::Engine.initializers.map(&:name)
 
-    xcfg = Struct.new(:recording_studio_history).new(pair_config)
-    app_config = Struct.new(:x).new(xcfg)
-
-    app = Struct.new(:config) do
-      def config_for(_name)
-        raise "missing file"
-      end
-    end.new(app_config)
-
-    find_initializer("recording_studio_history.load_config").block.call(app)
-
-    assert_equal 15, RecordingStudioHistory.configuration.timeout
-  end
-
-  def test_load_config_swallow_each_pair_errors
-    bad_pair_config = Class.new do
-      def each_pair
-        raise "bad pair"
-      end
-    end.new
-
-    xcfg = Struct.new(:recording_studio_history).new(bad_pair_config)
-    app_config = Struct.new(:x).new(xcfg)
-    app = Struct.new(:config) do
-      def config_for(_name)
-        { api_key: "ok" }
-      end
-    end.new(app_config)
-
-    # Should not raise even if xcfg.each_pair fails.
-    find_initializer("recording_studio_history.load_config").block.call(app)
-
-    assert_equal "ok", RecordingStudioHistory.configuration.api_key
-  end
-
-  def test_load_config_is_noop_without_config_sources
-    app = Struct.new(:config).new(Object.new)
-
-    find_initializer("recording_studio_history.load_config").block.call(app)
-
-    assert_nil RecordingStudioHistory.configuration.api_key
-    assert_equal 5, RecordingStudioHistory.configuration.timeout
-    assert_equal false, RecordingStudioHistory.configuration.enable_feature_x
-  end
-
-  def test_load_config_ignores_non_enumerable_yaml_and_merge_errors
-    yaml = Class.new do
-      def each
-        raise "bad yaml"
-      end
-    end.new
-
-    xcfg = Struct.new(:recording_studio_history).new({ timeout: 22 })
-    app_config = Struct.new(:x).new(xcfg)
-    app = Struct.new(:config) do
-      attr_accessor :yaml
-
-      def config_for(_name)
-        @yaml
-      end
-    end.new(app_config)
-    app.yaml = yaml
-
-    find_initializer("recording_studio_history.load_config").block.call(app)
-
-    assert_equal 22, RecordingStudioHistory.configuration.timeout
+    assert_includes names, "recording_studio_history.before_initialize"
+    assert_includes names, "recording_studio_history.on_configuration"
+    assert_includes names, "recording_studio_history.after_initialize"
+    refute_includes names, "recording_studio_history.load_config"
   end
 
   def test_apply_extension_initializers_register_active_support_on_load_callbacks

@@ -14,6 +14,14 @@ gem "recording_studio_history", github: "bowerbird-app/RecordingStudio_history"
 
 The gemspec requires Ruby 3.3 or newer, Rails `~> 8.1.0`, and `recording_studio` `~> 4.2`.
 
+## Configuration
+
+`RecordingStudioHistory.configure` yields `RecordingStudioHistory::Configuration`. The only setting is `hooks`, a `RecordingStudio::Hooks` instance. There is no API key, feature flag, timeout, or `config/recording_studio_history.yml`.
+
+## Mount point
+
+`recording_studio_history:install` can mount `RecordingStudioHistory::Engine`. Where the engine is mounted is still a product decision. This version does not treat a path as the addon contract.
+
 ## Run the dummy app
 
 The dummy app is a host application. It boots this addon with Workspace, Folder, and Page recordables. `config.require_recordable_declarations` stays true.
