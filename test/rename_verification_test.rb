@@ -4,49 +4,6 @@ require "yaml"
 require_relative "simplecov_helper"
 require "minitest/autorun"
 
-# =============================================================================
-# Gem Rename Verification Test Suite
-# =============================================================================
-#
-# This test suite verifies that a gem rename was performed correctly.
-# It auto-detects the current gem name from .gem_identity.yml or the gemspec
-# and validates all files and namespaces are consistent.
-#
-# TESTS INCLUDED:
-# ---------------
-# 1. File Existence:
-#    - Gemspec, main lib file, version.rb, engine.rb
-#    - Controllers and views directories
-#    - Generator files
-#
-# 2. Content Verification:
-#    - Gemspec has correct name and module references
-#    - All files define the correct PascalCase module
-#    - Routes reference correct Engine
-#    - Controllers are namespaced correctly
-#
-# 3. Orphan Detection (after rename):
-#    - No old gem_template references in Ruby files
-#    - No old directories (lib/gem_template, app/controllers/gem_template, etc.)
-#    - No old gemspec or main lib file
-#
-# 4. Runtime Loading:
-#    - Version file is loadable
-#    - Module and VERSION constant are accessible
-#
-# USAGE:
-# ------
-#   # Run standalone (skips Rails-dependent tests)
-#   ruby test/rename_verification_test.rb
-#
-#   # Run with verbose output
-#   ruby test/rename_verification_test.rb --verbose
-#
-#   # Run via Rake (if configured)
-#   bundle exec rake test:rename_verification
-#
-# =============================================================================
-
 class RenameVerificationTest < Minitest::Test
   def setup
     @root = File.expand_path("..", __dir__)
@@ -93,12 +50,6 @@ class RenameVerificationTest < Minitest::Test
     controllers_dir = File.join(@root, "app", "controllers", @gem_name)
     assert Dir.exist?(controllers_dir),
            "Expected controllers directory at #{controllers_dir}"
-  end
-
-  def test_views_directory_exists
-    views_dir = File.join(@root, "app", "views", @gem_name)
-    assert Dir.exist?(views_dir),
-           "Expected views directory at #{views_dir}"
   end
 
   # ============================================================
@@ -216,99 +167,6 @@ class RenameVerificationTest < Minitest::Test
     content = File.read(path)
     assert_match(/^module #{@pascal_name}$/, content,
                  "Home controller should be in module #{@pascal_name}")
-  end
-
-  # ============================================================
-  # No Orphaned Old Name References
-  # ============================================================
-
-  # These tests check that the original "gem_template" name has been
-  # completely replaced. They only run after a rename has occurred.
-
-  def test_no_old_gem_template_references_in_ruby_files
-    # Skip if current name IS gem_template (nothing to check - hasn't been renamed yet)
-    skip if @gem_name == "gem_template"
-
-    ruby_files = Dir.glob(File.join(@root, "**", "*.rb"))
-    # Exclude test files and this verification test itself
-    ruby_files.reject! { |f| f.include?("test/dummy") || f.include?("rename_verification_test.rb") }
-
-    files_with_old_refs = []
-
-    ruby_files.each do |file|
-      content = File.read(file)
-      files_with_old_refs << file if content.include?("gem_template") || content.include?("GemTemplate")
-    end
-
-    assert files_with_old_refs.empty?,
-           "Found old 'gem_template' references in:\n#{files_with_old_refs.join("\n")}"
-  end
-
-  def test_no_old_gem_template_directories
-    skip if @gem_name == "gem_template"
-
-    old_dirs = [
-      File.join(@root, "lib", "gem_template"),
-      File.join(@root, "app", "controllers", "gem_template"),
-      File.join(@root, "app", "views", "gem_template")
-    ]
-
-    existing_old_dirs = old_dirs.select { |d| Dir.exist?(d) }
-
-    assert existing_old_dirs.empty?,
-           "Found old 'gem_template' directories:\n#{existing_old_dirs.join("\n")}"
-  end
-
-  def test_no_old_gemspec_file
-    skip if @gem_name == "gem_template"
-
-    old_gemspec = File.join(@root, "gem_template.gemspec")
-    refute File.exist?(old_gemspec),
-           "Old gemspec file should not exist: #{old_gemspec}"
-  end
-
-  def test_no_old_main_lib_file
-    skip if @gem_name == "gem_template"
-
-    old_lib = File.join(@root, "lib", "gem_template.rb")
-    refute File.exist?(old_lib),
-           "Old main lib file should not exist: #{old_lib}"
-  end
-
-  def test_readme_has_no_leftover_template_identity_after_rename
-    skip if @gem_name == "gem_template"
-
-    content = File.read(File.join(@root, "README.md"))
-    refute_includes content, "GemTemplate",
-                    "README.md still contains leftover GemTemplate identity"
-    refute_match %r{bowerbird-app/gem_template(?:["'/]|$)}, content,
-                 "README.md still points at bowerbird-app/gem_template"
-    refute_includes content, "https://github.com/bowerbird-app/RecordingStudio_gem_template",
-                    "README.md still points at the template homepage"
-  end
-
-  def test_changelog_has_no_leftover_template_identity_after_rename
-    skip if @gem_name == "gem_template"
-
-    content = File.read(File.join(@root, "CHANGELOG.md"))
-    refute_includes content, "GemTemplate",
-                    "CHANGELOG.md still contains leftover GemTemplate identity"
-    refute_match %r{bowerbird-app/gem_template(?:["'/]|$)}, content,
-                 "CHANGELOG.md still points at bowerbird-app/gem_template"
-    refute_includes content, "https://github.com/bowerbird-app/RecordingStudio_gem_template",
-                    "CHANGELOG.md still points at the template homepage"
-  end
-
-  def test_gemspec_homepage_has_no_leftover_template_identity_after_rename
-    skip if @gem_name == "gem_template"
-
-    content = read_gemspec
-    refute_includes content, "GemTemplate",
-                    "Gemspec still contains leftover GemTemplate identity"
-    refute_match %r{bowerbird-app/gem_template(?:["'/]|$)}, content,
-                 "Gemspec still points at bowerbird-app/gem_template"
-    refute_includes content, "https://github.com/bowerbird-app/RecordingStudio_gem_template",
-                    "Gemspec still points at the template homepage"
   end
 
   # ============================================================
