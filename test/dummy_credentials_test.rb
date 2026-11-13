@@ -45,6 +45,7 @@ class DummyCredentialsTest < Minitest::Test
     )
 
     assert_operator parsed.fetch("secret_key_base").to_s.length, :>=, 64
+    # The encrypted file is the shared dummy credentials blob. Leave its key as-is.
     assert_equal PLACEHOLDER, parsed.dig("gem_template", "api_key")
     assert_equal PLACEHOLDER, parsed.dig("smtp", "user_name")
     assert_equal PLACEHOLDER, parsed.dig("smtp", "password")

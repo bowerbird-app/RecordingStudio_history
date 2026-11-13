@@ -2,23 +2,23 @@
 
 require "test_helper"
 
-class GemTemplateTest < Minitest::Test
+class RecordingStudioHistoryTest < Minitest::Test
   def test_version_matches_release
-    assert_equal "0.2.12", ::GemTemplate::VERSION
+    assert_equal "0.1.0", ::RecordingStudioHistory::VERSION
   end
 
   def test_engine_exists
-    assert_kind_of Class, ::GemTemplate::Engine
+    assert_kind_of Class, ::RecordingStudioHistory::Engine
   end
 
   def test_gemspec_pins_recording_studio_4_2
-    gemspec = File.read(File.expand_path("../gem_template.gemspec", __dir__))
+    gemspec = File.read(File.expand_path("../recording_studio_history.gemspec", __dir__))
 
     assert_includes gemspec, 'spec.add_dependency "recording_studio", "~> 4.2"'
   end
 
   def test_gemspec_excludes_cursor_config
-    spec = Gem::Specification.load(File.expand_path("../gem_template.gemspec", __dir__))
+    spec = Gem::Specification.load(File.expand_path("../recording_studio_history.gemspec", __dir__))
     cursor_files = spec.files.select { |path| path == ".cursor" || path.split("/").include?(".cursor") }
 
     assert_empty cursor_files, "gemspec must not package .cursor/ (got #{cursor_files.inspect})"
@@ -28,7 +28,7 @@ class GemTemplateTest < Minitest::Test
     path = File.expand_path("../.cursor/environment.json", __dir__)
     json = JSON.parse(File.read(path))
 
-    assert_equal "recording-studio-gem-template", json["name"]
+    assert_equal "recording-studio-history", json["name"]
     assert_equal ".cursor/install.sh", json["install"]
     assert_equal ".cursor/start.sh", json["start"]
     refute json.key?("snapshot"), "snapshot pins a Personal build and skips install"
@@ -121,18 +121,15 @@ class GemTemplateTest < Minitest::Test
   end
 
   def test_template_does_not_ship_copied_core_hooks_or_base_service
-    refute File.exist?(File.expand_path("../lib/gem_template/hooks.rb", __dir__))
-    refute File.exist?(File.expand_path("../lib/gem_template/services/base_service.rb", __dir__))
-    refute File.exist?(File.expand_path("../lib/gem_template/services/example_service.rb", __dir__))
+    refute File.exist?(File.expand_path("../lib/recording_studio_history/hooks.rb", __dir__))
+    refute File.exist?(File.expand_path("../lib/recording_studio_history/services/base_service.rb", __dir__))
+    refute File.exist?(File.expand_path("../lib/recording_studio_history/services/example_service.rb", __dir__))
   end
 
-  def test_example_capability_wraps_include_for_and_is_not_enabled_globally
-    source = File.read(File.expand_path("../lib/gem_template/capabilities/example.rb", __dir__))
-
-    assert_includes source, "def self.to(**)"
-    assert_includes source, "RecordingStudio::Capabilities.include_for(:example, **)"
-    refute_includes source, "enable_capability"
-    refute_includes source, "set_capability_options"
+  def test_installing_the_gem_does_not_register_or_enable_an_example_capability
+    refute defined?(RecordingStudio::Capabilities::Example)
+    refute RecordingStudio.registered_capabilities.key?(:example)
+    refute RecordingStudio.capability_enabled?(:example, for: "Workspace")
     refute RecordingStudio.capability_enabled?(:example, for: "Folder")
     refute RecordingStudio.capability_enabled?(:example, for: "Page")
     assert_empty RecordingStudio.configuration.enabled_recordable_types_for(:example)
@@ -200,7 +197,7 @@ class GemTemplateTest < Minitest::Test
     readme_path = File.expand_path("dummy/README.md", __dir__)
     readme_source = File.read(readme_path)
 
-    assert_includes readme_source, "This Rails app exists to validate the Recording Studio addon template"
+    assert_includes readme_source, "This Rails app boots recording_studio_history in a host application."
     assert_includes readme_source, "/recording_studio"
     assert_includes readme_source, "redirects to `/`"
     refute_includes readme_source, "flat_pack_sidebar"
@@ -246,14 +243,16 @@ class GemTemplateTest < Minitest::Test
     home = File.read(File.expand_path("dummy/app/views/home/index.html.erb", __dir__))
     login = File.read(File.expand_path("dummy/app/views/devise/sessions/new.html.erb", __dir__))
     audit = File.read(File.expand_path("dummy/config/bundler-audit.yml", __dir__))
-    installing = File.read(File.expand_path("../docs/gem_template/INSTALLING.md", __dir__))
+    installing = File.read(
+      File.expand_path("../lib/generators/recording_studio_history/install/install_generator.rb", __dir__)
+    )
 
     refute_match(/FlatPack::Card::Component\.new\([^)]*style:/, home)
     refute_match(/FlatPack::Card::Component\.new\([^)]*style:/, login)
     refute_includes audit, "GHSA-8qw7-6phv-7q6p"
     refute_includes installing, "flatpack/app/components"
     assert_includes installing, "bin/rails generate flat_pack:install"
-    assert_includes installing, '@source "../../vendor/bundle/**/gem_template/app/views/**/*.erb";'
+    assert_includes installing, '@source "../../vendor/bundle/**/recording_studio_history/app/views/**/*.erb";'
 
     importmap = File.read(File.expand_path("dummy/config/importmap.rb", __dir__))
     stimulus_loader = File.read(File.expand_path("dummy/app/javascript/controllers/index.js", __dir__))
@@ -283,8 +282,11 @@ class GemTemplateTest < Minitest::Test
     view_path = File.expand_path("dummy/app/views/home/index.html.erb", __dir__)
     view_source = File.read(view_path)
 
-    assert_includes view_source, 'title: "Template Demo"'
-    assert_includes view_source, 'subtitle: "This dummy app is the browser-facing demo surface for the template."'
+    assert_includes view_source, 'title: "History addon"'
+    assert_includes(
+      view_source,
+      'subtitle: "This dummy app boots recording_studio_history. History features come later."'
+    )
     assert_includes view_source, "FlatPack::Card::Component"
     assert_includes view_source, "dummy_page_nav"
     refute_includes view_source, 'title: "Demo"'
@@ -335,8 +337,38 @@ class GemTemplateTest < Minitest::Test
     refute_includes recordings_tree_view, "This tree is generated from RecordingStudio::Recording records"
   end
 
+  def test_readme_documents_hooks_only_and_an_undecided_mount
+    readme = File.read(File.expand_path("../README.md", __dir__))
+
+    assert_includes readme, "`hooks`, a `RecordingStudio::Hooks` instance"
+    assert_includes readme, "Where the engine is mounted is still a product decision."
+    refute_includes readme, "RECORDING_STUDIO_HISTORY_API_KEY"
+    refute_includes readme, "enable_feature_x"
+    refute_includes readme, "recording_studio_history:migrations"
+    refute_includes readme, "recording_studio_history_pages"
+  end
+
+  def test_engine_ships_no_sample_table_or_migrations_generator
+    root = File.expand_path("..", __dir__)
+
+    refute File.exist?(File.join(root, "db/migrate/20250101000001_create_recording_studio_history_pages.rb"))
+    refute File.exist?(File.join(root, "lib/generators/recording_studio_history/migrations/migrations_generator.rb"))
+    refute File.exist?(
+      File.join(root, "lib/generators/recording_studio_history/install/templates/recording_studio_history.yml")
+    )
+  end
+
+  def test_dummy_home_does_not_advertise_engine_migrations
+    home = File.read(File.expand_path("dummy/app/views/home/index.html.erb", __dir__))
+
+    assert_includes home, "The engine ships no addon tables yet."
+    assert_includes home, "Where the engine is mounted is still a product decision."
+    refute_includes home, "recording_studio_history:migrations"
+    refute_includes home, "PostgreSQL UUID-oriented migrations"
+  end
+
   def test_engine_does_not_ship_a_home_view
-    view_path = File.expand_path("../app/views/gem_template/home/index.html.erb", __dir__)
+    view_path = File.expand_path("../app/views/recording_studio_history/home/index.html.erb", __dir__)
 
     refute File.exist?(view_path)
   end
